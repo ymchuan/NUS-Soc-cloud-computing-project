@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user
+  template:
+    metadata:
+      labels:
+        app: user
+    spec:
+      initContainers:
+      - name: init-user-db
+        image: busybox
+        command: ['sh', '-c', 'while ! nslookup user-db-service.default.svc.cluster.local; do echo waiting for user-db to run; sleep 2; done;']
+      containers:
+      - name: user
+        image: tonyxie2017/unity-user:latest
+        ports:
+        - containerPort: 8445
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: "/config/application.properties"
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: POSTGRES_USERNAME
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: POSTGRES_PASSWORD
+      volumes:
+      - name: config-volume
+        configMap:
+          name: user-config
+          items:
+              - key: application.properties
+                path: application.properties
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+spec:
+  selector:
+    app: user
+  ports:
+    - protocol: TCP
+      port: 8445
+      targetPort: 8445
