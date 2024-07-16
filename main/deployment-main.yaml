@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: main
+  template:
+    metadata:
+      labels:
+        app: main
+    spec:
+      initContainers:
+      - name: init-main-db
+        image: busybox
+        command: ['sh', '-c', 'while ! nslookup main-db-service.default.svc.cluster.local; do echo waiting for main-db to run; sleep 2; done;']
+      containers:
+      - name: main
+        image: tonyxie2017/unity-main:latest
+        ports:
+        - containerPort: 8444
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: "/config/application.yaml"
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: POSTGRES_USERNAME
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: POSTGRES_PASSWORD
+      volumes:
+      - name: config-volume
+        configMap:
+          name: main-config
+          items:
+              - key: application.yaml
+                path: application.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: main-service  
+spec:
+  selector:
+    app: main
+  ports:
+    - protocol: TCP
+      port: 8444
+      targetPort: 8444
