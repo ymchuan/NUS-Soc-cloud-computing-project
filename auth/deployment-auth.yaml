@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+      - name: auth
+        image: tonyxie2017/unity-auth:latest
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: "/config/application.yaml"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: JWT_SECRET
+      volumes:
+      - name: config-volume
+        configMap:
+          name: auth-config
+          items:
+              - key: application.yaml
+                path: application.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: auth
+  ports:
+    - protocol: TCP
+      port: 8443
+      targetPort: 8443
